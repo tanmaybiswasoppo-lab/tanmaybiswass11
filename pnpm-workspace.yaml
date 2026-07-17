@@ -36,6 +36,7 @@ minimumReleaseAgeExclude:
 
 packages:
   - artifacts/*
+  - bots/*
   - lib/*
   - lib/integrations/*
   - scripts
@@ -72,6 +73,8 @@ onlyBuiltDependencies:
   - '@swc/core'
   - esbuild
   - msw
+  - puppeteer
+  - puppeteer-core
   - unrs-resolver
 
 overrides:

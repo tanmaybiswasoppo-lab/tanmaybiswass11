@@ -1,45 +1,49 @@
-# [Project name]
+# WhatsApp AI Bot
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A WhatsApp bot powered by Google Gemini AI with a 3-model fallback chain and sliding per-chat memory.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `pnpm --filter @workspace/whatsapp-bot run start` — run the WhatsApp bot (shows QR code in console)
+- The **WhatsApp Bot** workflow runs it automatically — check the console tab to see the QR code
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- pnpm workspaces, Node.js 24
+- WhatsApp: `whatsapp-web.js` (with `LocalAuth` for session persistence)
+- AI: `@google/generative-ai` — Gemini 2.5 Flash → 2.0 Flash Lite → Gemma 3 27B fallback chain
+- Chromium: System Chromium via Nix (NixOS-compatible puppeteer setup)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `bots/whatsapp-bot/src/index.js` — bot entry point, WhatsApp client, message handler
+- `bots/whatsapp-bot/src/gemini.js` — Gemini AI client with 3-model fallback
+- `bots/whatsapp-bot/src/memory.js` — sliding window memory (5 pairs / 10 messages per chat)
+- `bots/whatsapp-bot/.wwebjs_auth/` — auto-created session files (do not delete unless re-pairing)
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- **Model fallback order**: `gemini-2.5-flash` → `gemini-2.0-flash-lite` → `gemma-3-27b-it`. Any error (429, 503, network) triggers the next model automatically; 401/403 auth errors throw immediately.
+- **Sliding memory**: each chat keeps at most 10 messages (5 user + 5 model). Oldest pair is dropped when the limit is reached — no manual pruning needed.
+- **System Chromium**: puppeteer is configured to use the Nix-installed `/nix/store/.../chromium` binary instead of its bundled download, which lacks required shared libs on NixOS.
+- **LocalAuth**: WhatsApp session is persisted to `.wwebjs_auth/` so you only need to scan the QR once.
 
-## Product
+## Bot commands (send in WhatsApp)
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+| Command | Effect |
+|---------|--------|
+| `!clear` | Wipe this chat's memory |
+| `!stats` | Show memory usage for this chat |
+| `!help`  | List all commands |
+
+Any other message is sent to Gemini and replied to.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+_Populate as you build._
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- Delete `.wwebjs_auth/` and restart if the bot is stuck and not connecting (forces a new QR scan).
+- The QR code expires after ~30 seconds — restart the workflow to get a fresh one.
+- `GEMINI_API_KEY` must be set as a Replit Secret before starting.
